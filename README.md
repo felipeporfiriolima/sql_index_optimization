@@ -1,4 +1,4 @@
-# SQL Server Index Rationalization & Performance Optimization
+# SQL Server Index Rationalization & Performance Engineering
 
 > Database performance engineering project focused on identifying and removing redundant SQL Server indexes.
 
