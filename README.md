@@ -6,7 +6,7 @@
 
 ## 📌 Project Overview
 
-Over time, enterprise databases can accumulate redundant and overlapping indexes due to application changes, new query patterns, historical performance tuning and development activities.
+Over time, enterprise database environments can accumulate redundant and overlapping indexes due to application changes, new query patterns, historical performance tuning and development activities.
 
 Although indexes are essential for query performance, unnecessary indexes introduce additional costs:
 
@@ -17,20 +17,20 @@ Although indexes are essential for query performance, unnecessary indexes introd
 - Larger backup and restore footprints
 - Increased database complexity
 
-This project was created to systematically identify **duplicate and redundant indexes** across multiple SQL Server databases.
+This project focuses on **SQL Server Index Rationalization**, combining index metadata, workload statistics and storage analysis to identify redundant indexing structures.
 
-The analysis goes beyond simple duplicate detection by evaluating:
+The analysis was performed across a **multi-database SQL Server environment**, without exposing production database, table, schema or index names.
 
-- Index key columns
-- `INCLUDE` columns
-- Read activity
-- Write activity
-- Storage consumption
-- Index structure
-- Primary and unique constraints
-- Potential query coverage
+The project identified two main redundancy patterns:
 
-The result was the controlled removal of redundant indexes and approximately **16.27 GB of index storage released**.
+1. **Exact duplicate indexes**
+2. **Indexes with the same key columns and overlapping `INCLUDE` columns**
+
+The resulting optimization released approximately:
+
+# **16.27 GB of index storage**
+
+while reducing unnecessary index maintenance and simplifying the indexing strategy.
 
 ---
 
@@ -38,15 +38,17 @@ The result was the controlled removal of redundant indexes and approximately **1
 
 The main objectives of the project were:
 
-1. Identify exact duplicate indexes.
-2. Identify indexes with the same key columns but overlapping `INCLUDE` columns.
-3. Analyze index read/write activity.
-4. Identify indexes with high maintenance cost.
-5. Measure the storage footprint of redundant indexes.
-6. Determine safe candidates for removal.
-7. Reduce unnecessary index maintenance.
-8. Simplify the overall indexing strategy.
-9. Preserve existing query access paths and workload performance.
+- Identify exact duplicate indexes.
+- Identify indexes with the same key columns but different `INCLUDE` definitions.
+- Analyze index read/write activity.
+- Identify indexes with high maintenance overhead.
+- Measure index storage consumption.
+- Evaluate potential query coverage.
+- Determine safe candidates for removal.
+- Reduce unnecessary index maintenance.
+- Reduce redundant storage consumption.
+- Simplify the overall indexing strategy.
+- Preserve required query access paths.
 
 ---
 
@@ -54,31 +56,39 @@ The main objectives of the project were:
 
 The project categorized redundant indexes into two main patterns.
 
+---
+
 ## 1. Exact Duplicate Indexes
 
-Indexes containing the same key columns and ordering.
+The first pattern involves indexes with identical key columns and ordering.
 
 Example:
 
 ```text
 Index A
-KEY:
-    ID_Contrato ASC
-    ID_FonteOrigem ASC
 
-Index B
 KEY:
-    ID_Contrato ASC
-    ID_FonteOrigem ASC
+    CustomerID ASC
+    ContractID ASC
 ```
 
-If both indexes provide the same access path and neither provides additional functionality, one index becomes a candidate for removal.
+```text
+Index B
+
+KEY:
+    CustomerID ASC
+    ContractID ASC
+```
+
+When two indexes provide the same access path and neither provides additional functionality, one becomes a candidate for removal.
+
+The decision was validated against usage statistics, index properties and workload characteristics.
 
 ---
 
-## 2. Same Key Columns with Different INCLUDE Columns
+## 2. Same Key Columns + INCLUDE Overlap
 
-A more complex scenario occurs when indexes have identical key columns but different included columns.
+A more complex scenario occurs when two indexes contain the same key columns but different included columns.
 
 Example:
 
@@ -86,35 +96,40 @@ Example:
 Index A
 
 KEY:
-    ID_usuario
-    ID_CRM_Grupo
+    CustomerID
+    ContractID
 
 INCLUDE:
-    ID_Cliente
-    ID_ClienteTipo
-    nrCpfCnpj
-    DtSaida
+    CustomerType
+    SourceID
+    DueDate
+    Status
 ```
 
 ```text
 Index B
 
 KEY:
-    ID_usuario
-    ID_CRM_Grupo
+    CustomerID
+    ContractID
+
+INCLUDE:
+    CustomerType
+    SourceID
 ```
 
-In this situation, the indexes are not necessarily exact duplicates.
+In this situation, the indexes are not exact duplicates.
 
-The analysis must determine whether one index already provides sufficient coverage for the workload.
+The analysis therefore considered whether one index already provided sufficient coverage for the relevant workload.
 
-The following factors were considered:
+The following factors were evaluated:
 
-- Query coverage
+- Key column structure
 - `INCLUDE` columns
+- Query coverage
 - Read activity
 - Write activity
-- Lookup requirements
+- Key lookups
 - Storage footprint
 - Workload characteristics
 
@@ -122,42 +137,60 @@ The following factors were considered:
 
 # 🔎 Analysis Methodology
 
-The index rationalization process followed these stages:
+The index rationalization process followed a structured workflow:
 
 ```text
-SQL Server Metadata
-        │
-        ▼
-Index Inventory
-        │
-        ▼
-Duplicate Detection
-        │
-        ├── Exact Duplicate
-        │
-        └── Same Key + INCLUDE
-        │
-        ▼
-Usage Analysis
-        │
-        ├── Reads
-        ├── Writes
-        └── Read/Write Ratio
-        │
-        ▼
-Storage Analysis
-        │
-        ▼
-Risk Assessment
-        │
-        ▼
-Candidate Validation
-        │
-        ▼
-Controlled Index Removal
-        │
-        ▼
-Post-Change Validation
+┌───────────────────────────────┐
+│     SQL Server Metadata       │
+└───────────────┬───────────────┘
+                │
+                ▼
+┌───────────────────────────────┐
+│       Index Inventory         │
+└───────────────┬───────────────┘
+                │
+                ▼
+┌───────────────────────────────┐
+│     Duplicate Detection       │
+│                               │
+│  • Exact Duplicate            │
+│  • Same Key + INCLUDE         │
+└───────────────┬───────────────┘
+                │
+                ▼
+┌───────────────────────────────┐
+│      Usage Analysis           │
+│                               │
+│  • Seeks                      │
+│  • Scans                      │
+│  • Lookups                    │
+│  • Updates                    │
+└───────────────┬───────────────┘
+                │
+                ▼
+┌───────────────────────────────┐
+│      Storage Analysis         │
+└───────────────┬───────────────┘
+                │
+                ▼
+┌───────────────────────────────┐
+│       Risk Assessment         │
+└───────────────┬───────────────┘
+                │
+                ▼
+┌───────────────────────────────┐
+│    Candidate Validation       │
+└───────────────┬───────────────┘
+                │
+                ▼
+┌───────────────────────────────┐
+│   Controlled Index Removal    │
+└───────────────┬───────────────┘
+                │
+                ▼
+┌───────────────────────────────┐
+│    Post-Change Validation     │
+└───────────────────────────────┘
 ```
 
 ---
@@ -166,23 +199,23 @@ Post-Change Validation
 
 ## Index Structure
 
-Each index was analyzed according to:
+Each index candidate was evaluated based on:
 
 - Key columns
 - Column ordering
 - Sort direction
 - Included columns
 - Index type
+- Clustered / Nonclustered structure
 - Unique indexes
 - Primary keys
-- Clustered indexes
-- Nonclustered indexes
+- Unique constraints
 
 ---
 
 ## Workload Analysis
 
-SQL Server index usage statistics were analyzed to understand how each index was being used.
+SQL Server index usage statistics were used to understand how each index was being accessed.
 
 Key metrics included:
 
@@ -202,24 +235,27 @@ Key metrics included:
 The physical footprint of each index was also evaluated.
 
 ```text
-TotalReservedMB
+Index Reserved Space
         │
         ▼
-Index Storage Footprint
+Storage Footprint
         │
         ▼
-Potential Storage Savings
+Potential Savings
+        │
+        ▼
+Optimization Priority
 ```
 
-This allowed high-impact candidates to be prioritized.
+Large redundant indexes were prioritized because they provided significant opportunities for storage optimization.
 
 ---
 
 # 🛡️ Risk Assessment
 
-An index was not removed solely because it had low usage.
+An index was **not removed solely because it had low usage**.
 
-Before removal, candidates were evaluated against:
+Each candidate was evaluated against:
 
 - Query access patterns
 - Read activity
@@ -228,9 +264,9 @@ Before removal, candidates were evaluated against:
 - `INCLUDE` coverage
 - Primary key constraints
 - Unique constraints
-- Application dependencies
 - Potential key lookups
 - Potential execution plan regression
+- Application dependencies
 - Storage impact
 
 The objective was to remove **redundancy**, not simply reduce the number of indexes.
@@ -241,7 +277,7 @@ The objective was to remove **redundancy**, not simply reduce the number of inde
 
 The analysis used SQL Server catalog views and Dynamic Management Views (DMVs).
 
-```sql
+```text
 sys.indexes
 sys.index_columns
 sys.columns
@@ -251,13 +287,23 @@ sys.dm_db_index_usage_stats
 sys.dm_db_partition_stats
 ```
 
-These objects were combined to build an index inventory containing structural, workload and storage information.
+These objects were combined to build an index inventory containing:
+
+```text
+Index Definition
+       +
+Usage Statistics
+       +
+Storage Information
+       +
+Workload Characteristics
+```
 
 ---
 
-# 🧪 Example Analysis
+# 🧪 Example SQL Analysis
 
-A simplified example of the analysis logic:
+The following is a simplified example of the metadata analysis.
 
 ```sql
 SELECT
@@ -273,7 +319,7 @@ FROM sys.indexes i
 WHERE i.index_id > 0;
 ```
 
-Index usage statistics were then correlated with index metadata:
+Index usage statistics were correlated with index metadata:
 
 ```sql
 SELECT
@@ -294,108 +340,73 @@ WHERE i.index_id > 0;
 
 Storage information was evaluated using:
 
-```sql
+```text
 sys.dm_db_partition_stats
 ```
 
-This combination allowed structural information to be correlated with actual workload behavior.
+The resulting dataset was then used to identify candidates for further analysis.
 
 ---
 
 # 📈 Key Findings
 
-The analysis identified redundant indexes across multiple SQL Server databases.
+The analysis identified redundant indexes across multiple databases, schemas and tables.
 
-## 🥇 Largest Storage Saving
+To preserve confidentiality, all object names and environment-specific identifiers have been anonymized.
 
-### `tblCRM_Grupo_Cliente_Analista`
+---
+
+## 🥇 Largest Individual Optimization
 
 ```text
-Database:
-db_GlobalOne_Servico
-
-Schema:
-CB2B
-
-Total Reserved:
-36,155.69 MB
-
-Updates:
-1,462
-
-Reads:
-28,557
-
-Index Removed:
-IX_CRM_Grupo_Analista_AUX
+Finding:
+Same Key + INCLUDE Overlap
 
 Storage Released:
 9,038.18 MB
+
+≈ 8.83 GB
 ```
 
-Approximately **8.83 GB** of storage was released from this single redundant index.
+This was the largest individual storage optimization identified during the analysis.
 
 ---
 
-## 🥈 Large Duplicate Index
-
-### `tblSTAGE_MVL_PRODUTO_CAR`
+## 🥈 Large Exact Duplicate
 
 ```text
-Database:
-db_GlobalOne_Telefonica
-
-Total Reserved:
-8,514.39 MB
-
-Updates:
-745,414
-
-Reads:
-39,234
-
-Index Removed:
-IDX_MVL_PRODUTO_CAR
+Finding:
+Exact Duplicate
 
 Storage Released:
 3,230.41 MB
+
+≈ 3.15 GB
 ```
 
-Approximately **3.15 GB** was released.
+The candidate represented a substantial redundant index footprint.
 
 ---
 
-## 🥉 Large Storage Reduction
-
-### `tblSTG_EBILLING_old`
+## 🥉 Another High-Impact Duplicate
 
 ```text
-Database:
-db_GlobalOne_Servico
-
-Total Reserved:
-6,324.67 MB
-
-Updates:
-0
-
-Reads:
-0
-
-Index Removed:
-SK01_tblSTG_EBILLING2
+Finding:
+Exact Duplicate
 
 Storage Released:
 3,162.33 MB
+
+≈ 3.09 GB
 ```
 
-This was a strong candidate because the redundant index consumed significant storage while presenting no recorded read or write activity in the analyzed DMV window.
+The index presented significant storage consumption while showing no recorded read/write activity during the analyzed DMV window.
 
 ---
 
-# ⚡ High Write-Cost Example
+# ⚡ High Write-Maintenance Example
 
-### `TblProposta_LogAPI`
+One candidate presented the following workload characteristics:
 
 ```text
 Updates:
@@ -404,91 +415,15 @@ Updates:
 Reads:
 241
 
-Index Removed:
-IX_TblProposta_LogAPI_dtEvento
-
 Storage Released:
 70.55 MB
 ```
 
 Although the storage saving was relatively small, the index represented significant write-maintenance activity.
 
-This demonstrates an important aspect of index rationalization:
+This demonstrates that index rationalization is not exclusively a storage optimization exercise.
 
-> Storage reduction is not the only benefit of removing redundant indexes.
-
-Reducing unnecessary indexes can also reduce maintenance work generated by DML operations.
-
----
-
-# 🔥 High Read Activity Example
-
-### `TblProposta_Status`
-
-```text
-Reads:
-319,560,609
-
-Updates:
-0
-
-Index Removed:
-IX_TblProposta_Status
-```
-
-This was an important validation case.
-
-A simplistic index-cleanup process might assume that an index with extremely high reads must be retained.
-
-However, the analysis identified redundancy based on the index structure and the presence of another index providing the required access path.
-
-This reinforces the principle that:
-
-> Index usage statistics must be analyzed together with index structure.
-
----
-
-# 📊 Project Results
-
-The consolidated analysis produced the following results:
-
-| Metric | Result |
-|---|---:|
-| Databases | Multiple enterprise databases |
-| Redundancy patterns | 2 |
-| Storage released | **16,664 MB** |
-| Storage released | **~16.27 GB** |
-| Largest single saving | **9,038.18 MB** |
-| Analysis scope | Multiple schemas and tables |
-| Optimization type | Index Rationalization |
-
----
-
-# 💡 Key Engineering Insights
-
-## 1. Low usage does not automatically mean redundant
-
-An index with low reads may still be important for a specific workload.
-
-Therefore, low utilization alone is insufficient for deletion.
-
----
-
-## 2. High usage does not automatically mean unique value
-
-An index can have millions of reads and still be redundant if another index provides the same required access path.
-
----
-
-## 3. INCLUDE columns require deeper analysis
-
-Indexes with identical keys but different `INCLUDE` columns require query coverage analysis before removal.
-
----
-
-## 4. Indexes have write costs
-
-Every additional nonclustered index may increase the amount of work required for:
+Removing unnecessary indexes can also reduce maintenance overhead generated by:
 
 ```text
 INSERT
@@ -500,76 +435,273 @@ operations.
 
 ---
 
-## 5. Storage is only one part of the optimization
+# 🔥 High-Read Redundancy Example
 
-Index rationalization addresses multiple dimensions:
+Another candidate presented:
 
 ```text
-Storage
-   +
-Read Performance
-   +
-Write Performance
-   +
-Maintenance
-   +
-Operational Complexity
+Reads:
+319,560,609
+
+Updates:
+0
+```
+
+Despite the extremely high read count, the index was identified as redundant based on the overall index structure and availability of another access path.
+
+This demonstrates an important principle:
+
+> High index usage does not necessarily mean that the index is unique or indispensable.
+
+Index usage statistics must be analyzed together with index definitions and workload requirements.
+
+---
+
+# 📊 Optimization Results
+
+The consolidated analysis produced the following results:
+
+| Metric | Result |
+|---|---:|
+| SQL Server databases analyzed | Multiple |
+| Redundancy patterns identified | **2** |
+| Exact duplicate pattern | **Identified** |
+| Same Key + INCLUDE pattern | **Identified** |
+| Storage released | **16,664 MB** |
+| Storage released | **~16.27 GB** |
+| Largest single optimization | **9,038.18 MB** |
+| Highest observed reads | **319.5M+** |
+| Highest observed updates | **3.27M+** |
+| Scope | **Multi-database SQL Server environment** |
+
+---
+
+# 📊 Storage Impact
+
+The optimization can be summarized as:
+
+```text
+Before
+────────────────────────────────────
+Redundant Index Structures
+        │
+        │
+        ▼
+~16.27 GB of Identified Footprint
+        │
+        ▼
+Index Rationalization
+        │
+        ▼
+After
+────────────────────────────────────
+~16.27 GB Released
+```
+
+The largest individual optimization represented approximately:
+
+```text
+9,038.18 MB
+≈ 8.83 GB
+```
+
+---
+
+# 💡 Key Engineering Insights
+
+## 1. Low usage does not automatically mean redundant
+
+An index with low reads may still be important for a specific workload.
+
+Therefore, low utilization alone is insufficient to justify removal.
+
+---
+
+## 2. High usage does not automatically mean unique value
+
+An index can have millions of reads and still be redundant if another index provides the required access path.
+
+---
+
+## 3. INCLUDE columns require deeper analysis
+
+Indexes with identical keys but different `INCLUDE` columns require additional analysis.
+
+The objective is to determine whether one index can provide equivalent or sufficient query coverage.
+
+---
+
+## 4. Indexes have write costs
+
+Every additional nonclustered index can increase maintenance work during:
+
+```text
+INSERT
+UPDATE
+DELETE
+```
+
+operations.
+
+This can become significant on high-write tables.
+
+---
+
+## 5. Storage is only one dimension
+
+Index rationalization addresses multiple optimization dimensions:
+
+```text
+              ┌──────────────┐
+              │    Storage   │
+              └──────┬───────┘
+                     │
+        ┌────────────┼────────────┐
+        │            │            │
+        ▼            ▼            ▼
+     Reads        Writes      Maintenance
+        │            │            │
+        └────────────┼────────────┘
+                     │
+                     ▼
+             Index Rationalization
 ```
 
 ---
 
 # 🏆 Business & Technical Impact
 
-The initiative generated measurable infrastructure and database optimization benefits.
+## Storage Optimization
 
-### Storage
+Approximately:
 
-**~16.27 GB of index storage released**
+# **16.27 GB of index storage released**
 
-### Maintenance
+---
 
-Reduction of unnecessary index maintenance operations.
+## Maintenance Optimization
 
-### Database Footprint
+Removal of redundant indexes reduces unnecessary maintenance work during DML operations.
 
-Smaller physical database footprint for redundant index structures.
+---
 
-### Operational Complexity
+## Database Footprint
 
-Reduced number of redundant indexing structures requiring monitoring and maintenance.
+Reduced physical storage requirements associated with redundant index structures.
 
-### Performance Engineering
+---
+
+## Operational Complexity
+
+Fewer redundant indexes means a simpler indexing architecture to monitor and maintain.
+
+---
+
+## Performance Engineering
 
 Improved alignment between index structures and actual workload requirements.
 
 ---
 
-# 🛠️ Technologies
+# 🔐 Data Confidentiality
 
-- SQL Server
+All environment-specific information has been intentionally anonymized.
+
+The project does not expose:
+
+- Database names
+- Schema names
+- Table names
+- Index names
+- Application-specific identifiers
+- Business-sensitive column names
+
+The metrics and methodology presented in this case study represent the technical nature and optimization results of the initiative while preserving the confidentiality of the underlying environment.
+
+---
+
+# 🛠️ Technologies & Skills
+
+### Database
+
+- Microsoft SQL Server
 - T-SQL
-- SQL Server DMVs: 
-  `sys.indexes`,
-  `sys.index_columns`,
-  `sys.columns`,
-  `sys.dm_db_index_usage_stats`,
-  `sys.dm_db_partition_stats`
+- SQL Server DMVs
+- SQL Server Catalog Views
+
+### Performance Engineering
+
 - Index Rationalization
+- Index Optimization
 - Database Performance Tuning
 - Query Performance Analysis
-- Index Optimization
+- Workload Analysis
 - Storage Optimization
 - Execution Plan Analysis
-- Workload Analysis
-- Database Engineering
+- Index Coverage Analysis
+
+### SQL Server Internals
+
+- `sys.indexes`
+- `sys.index_columns`
+- `sys.columns`
+- `sys.tables`
+- `sys.schemas`
+- `sys.dm_db_index_usage_stats`
+- `sys.dm_db_partition_stats`
+
+---
+
+# 📁 Project Structure
+
+```text
+sql-server-index-rationalization/
+│
+├── README.md
+│
+├── sql/
+│   ├── 01_index_inventory.sql
+│   ├── 02_index_usage_analysis.sql
+│   ├── 03_duplicate_indexes.sql
+│   ├── 04_include_overlap_analysis.sql
+│   ├── 05_index_storage_analysis.sql
+│   └── 06_index_removal_candidates.sql
+│
+├── reports/
+│   ├── index_inventory.csv
+│   ├── duplicate_indexes.csv
+│   └── optimization_results.csv
+│
+└── docs/
+    └── index-rationalization-analysis.md
+```
+
+---
+
+# 🚀 Future Improvements
+
+Potential improvements to the project include:
+
+- Automated duplicate index detection
+- Automated `INCLUDE` column comparison
+- Index overlap scoring
+- Index redundancy scoring
+- Read/write cost scoring
+- Storage impact ranking
+- Automated candidate prioritization
+- Execution plan comparison before and after removal
+- Query Store integration
+- Historical workload analysis
+- Power BI dashboard for index health monitoring
+- Automated reporting of redundant indexes
 
 ---
 
 # 📌 Conclusion
 
-This project demonstrates a systematic approach to **SQL Server Index Rationalization**, combining database metadata, workload statistics and physical storage analysis to identify redundant indexing structures.
+This project demonstrates a systematic approach to **SQL Server Index Rationalization**, combining database metadata, workload statistics, index definitions and physical storage analysis.
 
-Rather than applying a simple "unused index removal" strategy, the project evaluates the relationship between:
+Rather than applying a simple "unused index removal" strategy, the analysis evaluates the relationship between:
 
 ```text
 Index Structure
@@ -582,29 +714,36 @@ Writes
       +
 Storage
       +
-Coverage
+Query Coverage
+      +
+Maintenance Cost
 ```
 
-The result was the identification and controlled removal of redundant indexes, contributing to approximately:
+The initiative resulted in approximately:
 
-# **16.27 GB of storage released**
+# **16.27 GB of index storage released**
 
-while reducing unnecessary index maintenance and improving the overall manageability of the SQL Server environment.
+while reducing redundant index structures, unnecessary maintenance overhead and overall indexing complexity.
+
+The project demonstrates practical experience in:
+
+> **SQL Server Performance Engineering, Index Optimization, Workload Analysis and Database Architecture.**
 
 ---
 
-# 👨‍💻 Skills Demonstrated
+## 👨‍💻 Skills Demonstrated
 
 ```text
 Database Performance Engineering
 SQL Server Internals
-Index Optimization
 Index Rationalization
+Index Optimization
 T-SQL
 DMV Analysis
 Query Performance
 Storage Optimization
 Workload Analysis
+Index Coverage Analysis
 Database Architecture
 Performance Tuning
 Database Engineering
