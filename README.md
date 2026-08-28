@@ -80,6 +80,30 @@ Index Removal
 Post-Change Validation
 ```
 
+## 🧪 Technical Implementation
+
+The analysis was implemented in T-SQL and automated across all online user databases.
+
+The script collects:
+
+- Index metadata
+- Key columns and sort order
+- `INCLUDE` columns
+- Filter definitions
+- Index size
+- Row count
+- Read activity
+- Write activity
+
+Index signatures are generated using `SHA2_256` hashes to compare index structures efficiently.
+
+The analysis identifies three patterns:
+
+1. **Exact duplicates** — identical KEY, INCLUDE and FILTER definitions
+2. **Same KEY + FILTER** — identical access keys with potentially different INCLUDE columns
+
+The final decision to remove an index is based on workload, storage impact, index properties and risk assessment rather than structural similarity alone.
+
 ## 1. Exact Duplicate Indexes
 
 The first pattern involves indexes with identical key columns and ordering.
