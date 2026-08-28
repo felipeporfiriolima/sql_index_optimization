@@ -549,11 +549,11 @@ Improved alignment between index structures and actual workload requirements.
 - SQL Server
 - T-SQL
 - SQL Server DMVs
-- `sys.indexes`
-- `sys.index_columns`
-- `sys.columns`
-- `sys.dm_db_index_usage_stats`
-- `sys.dm_db_partition_stats`
+  `sys.indexes`
+  `sys.index_columns`
+  `sys.columns`
+  `sys.dm_db_index_usage_stats`
+  `sys.dm_db_partition_stats`
 - Index Rationalization
 - Database Performance Tuning
 - Query Performance Analysis
@@ -562,32 +562,6 @@ Improved alignment between index structures and actual workload requirements.
 - Execution Plan Analysis
 - Workload Analysis
 - Database Engineering
-
----
-
-# 📁 Project Structure
-
-```text
-sql-server-index-rationalization/
-│
-├── README.md
-│
-├── sql/
-│   ├── 01_index_inventory.sql
-│   ├── 02_index_usage_analysis.sql
-│   ├── 03_duplicate_indexes.sql
-│   ├── 04_include_overlap_analysis.sql
-│   ├── 05_index_storage_analysis.sql
-│   └── 06_index_removal_candidates.sql
-│
-├── reports/
-│   ├── index_inventory.csv
-│   ├── duplicate_indexes.csv
-│   └── optimization_results.csv
-│
-└── docs/
-    └── index-rationalization-analysis.md
-```
 
 ---
 
