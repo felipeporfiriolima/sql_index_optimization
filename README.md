@@ -9,7 +9,7 @@ This project documentation is available in the following languages:
 - 🇺🇸 English (current)
 - 🇧🇷 [Português](README-PT.md)
 
----
+--
 
 ## 📌 Overview
 
