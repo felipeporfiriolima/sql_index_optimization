@@ -9,8 +9,6 @@ This project documentation is available in the following languages:
 - 🇺🇸 English (current)
 - 🇧🇷 [Português](README-PT.md)
 
---
-
 ## 📌 Overview
 
 Enterprise SQL Server environments can accumulate duplicate and overlapping indexes over time, increasing storage consumption and index maintenance overhead.
