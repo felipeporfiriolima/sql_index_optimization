@@ -10,6 +10,18 @@ This project analyzes index definitions, workload statistics and storage usage t
 
 All environment-specific information has been anonymized.
 
+## 👨‍💻 My Contribution
+
+Responsible for the identification, analysis and validation of redundant SQL Server indexes, including:
+
+- Development of T-SQL queries for index inventory and usage analysis
+- Identification of exact duplicate indexes
+- Analysis of overlapping indexes with identical key columns
+- Evaluation of read/write workload
+- Storage impact analysis
+- Risk assessment before index removal
+- Validation of optimization results
+
 ## 🎯 Objectives
 
 - Identify exact duplicate indexes
