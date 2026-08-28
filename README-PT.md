@@ -2,6 +2,13 @@
 
 > Projeto de engenharia de performance em banco de dados focado na identificação e remoção de índices redundantes no SQL Server.
 
+## Documentação
+
+A documentação deste projeto está disponível nos seguintes idiomas:
+
+- 🇧🇷 Português (atual)
+- 🇺🇸 [English](README.md)
+
 ## 📌 Visão Geral
 
 Ambientes enterprise de SQL Server podem acumular índices duplicados e sobrepostos ao longo do tempo, aumentando o consumo de armazenamento e o overhead de manutenção dos índices.
