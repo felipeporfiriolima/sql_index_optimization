@@ -4,7 +4,6 @@
     Saídas:
       1) DUPLICATE_EXACT: KEY + INCLUDE + FILTER iguais
       2) DUPLICATE_KEYS_ONLY: mesma KEY + FILTER (INCLUDE pode variar) - lista índices via XML concat
-      3) OVERLAP_PREFIX_KEYS: um índice tem as KEYS do outro como prefixo (heurística útil)
 
     Observações:
       - Varrendo todos DBs online (exceto system dbs por padrão)
@@ -203,50 +202,6 @@ FROM ##IdxSig x
 GROUP BY DatabaseName, SchemaName, TableName, ObjectId, KeySig, KeyCols, FilterDefinition
 HAVING COUNT(*) > 1
 ORDER BY SUM(ISNULL(ReservedMB,0)) DESC, DatabaseName, SchemaName, TableName;
-
---------------------------------------------------------------------------------
--- 3) Sobreposição por prefixo de KEYs (heurística segura para 2012+)
---    Ex: IX1 (A,B) e IX2 (A,B,C) => IX2 pode substituir IX1 em muitos cenários
---------------------------------------------------------------------------------
-;WITH Pairs AS
-(
-    SELECT
-        a.DatabaseName, a.SchemaName, a.TableName,
-        a.ObjectId,
-        a.IndexName AS SmallerIndex,
-        b.IndexName AS LargerIndex,
-        a.KeyCols   AS SmallerKeyCols,
-        b.KeyCols   AS LargerKeyCols,
-        a.IncludeCols AS SmallerIncludes,
-        b.IncludeCols AS LargerIncludes,
-        a.FilterDefinition,
-        a.ReservedMB AS SmallerMB,
-        b.ReservedMB AS LargerMB,
-        (ISNULL(a.UserSeeks,0) + ISNULL(a.UserScans,0) + ISNULL(a.UserLookups,0)) AS SmallerReads,
-        (ISNULL(b.UserSeeks,0) + ISNULL(b.UserScans,0) + ISNULL(b.UserLookups,0)) AS LargerReads,
-        ISNULL(a.UserUpdates,0) AS SmallerUpdates,
-        ISNULL(b.UserUpdates,0) AS LargerUpdates
-    , COUNT(1) OVER() AS _totRecords
-    FROM ##IdxSig a
-    JOIN ##IdxSig b
-      ON b.DatabaseName = a.DatabaseName
-     AND b.ObjectId     = a.ObjectId
-     AND b.IndexId     <> a.IndexId
-     AND ISNULL(b.FilterDefinition,N'') = ISNULL(a.FilterDefinition,N'')
-     AND b.KeyCols LIKE a.KeyCols + N'%'
-)
-SELECT TOP (500)
-    Finding = 'OVERLAP_PREFIX_KEYS',
-    DatabaseName, SchemaName, TableName,
-    SmallerIndex, LargerIndex,
-    SmallerKeyCols, LargerKeyCols,
-    SmallerIncludes, LargerIncludes,
-    FilterDefinition,
-    SmallerMB, LargerMB,
-    SmallerReads, LargerReads,
-    SmallerUpdates, LargerUpdates
-FROM Pairs
-ORDER BY ISNULL(SmallerMB,0) DESC, DatabaseName, SchemaName, TableName;
 
 
  
