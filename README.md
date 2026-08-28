@@ -549,7 +549,7 @@ Improved alignment between index structures and actual workload requirements.
 - SQL Server
 - T-SQL
 - SQL Server DMVs
-  `sys.indexes`
+  -`sys.indexes`
   `sys.index_columns`
   `sys.columns`
   `sys.dm_db_index_usage_stats`
